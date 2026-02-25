@@ -756,6 +756,7 @@
 
             let previousLogTime = new Date(logs[0].ts).getTime();
             let stepStartTime = null;
+            let lastMappedLogTime = null;
 
             for (let i = 0; i < logs.length; i++) {
                 if (id === 'earthquake' && earthquakeEarlyExitTriggered) break;
@@ -767,6 +768,12 @@
 
                 await customDelay(delay);
 
+                // Match the tech demo's typewriter visual delay so total simulated time matches exactly.
+                const typingStep = speedMultiplier > 1 ? 15 : 3;
+                for (let j = 0; j < log.message.length; j += typingStep) {
+                    await customDelay(speedMultiplier > 1 ? 1 : 5);
+                }
+
                 const stepInfo = getStepData(log);
 
                 if (stepInfo) {
@@ -774,7 +781,9 @@
                     if (currentActiveStepKey !== stepInfo.step) {
                         // Mark old as done and record duration
                         if (currentActiveStepKey) {
-                            const elapsed = currentLogTime - stepStartTime;
+                            // Calculate step duration strictly based on its LAST mapped log, ignoring THINK delays between steps
+                            const historicElapsed = lastMappedLogTime - stepStartTime;
+                            const elapsed = Math.max(historicElapsed, 800);
 
                             // Visual updates for list
                             if (currentActiveStepKey !== '6_insight') {
@@ -797,6 +806,7 @@
                         // Setup new step
                         currentActiveStepKey = stepInfo.step;
                         stepStartTime = currentLogTime;
+                        lastMappedLogTime = currentLogTime;
 
                         // Activate new graphic node
                         const newNode = document.getElementById(`node-${id}-${currentActiveStepKey}`);
@@ -813,6 +823,8 @@
                             newStep.classList.add('active');
                             document.getElementById(`duration-${id}-${currentActiveStepKey}`).textContent = '...';
                         }
+                    } else {
+                        lastMappedLogTime = currentLogTime;
                     }
 
                     // Update tech text subtly
@@ -825,6 +837,10 @@
                     if (stepInfo.step === "6_insight") {
                         break; // Exit loop, show insight
                     }
+                } else if (currentActiveStepKey && currentActiveStepKey !== '6_insight') {
+                    // Update sub-text for unmapped logs (like THINK) so UI does not look frozen
+                    const techEl = document.getElementById(`tech-${id}-${currentActiveStepKey}`);
+                    techEl.textContent = `${log.kind.toLowerCase()}: analyzing memory context...`;
                 }
 
                 previousLogTime = currentLogTime;
