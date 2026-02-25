@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TiDB Zero Agent - Business Demonstration</title>
+    <script src="unified_scenarios_data.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Base Reset */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #0f172a;
+            /* Slate 900 */
+            color: #e2e8f0;
+            /* Slate 200 */
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        header {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            padding: 15px 30px;
+            height: 70px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 500;
+            background: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 0.5px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .timer {
+            font-variant-numeric: tabular-nums;
+            color: #38bdf8;
+            /* Sky 400 */
+            font-size: 1.25em;
+            font-weight: 600;
+            min-width: 130px;
+            text-align: right;
+            text-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(4px);
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        #pause-toggle.paused {
+            background: rgba(245, 158, 11, 0.2);
+            border-color: #f59e0b;
+            color: #fcd34d;
+        }
+
+        /* Grid Layout */
+        .grid-container {
+            flex-grow: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            height: calc(100vh - 70px);
+            overflow: hidden;
+            background: radial-gradient(circle at top right, #1e293b 0%, #0f172a 100%);
+        }
+
+        .agent-card {
+            background: rgba(30, 41, 59, 0.5);
+            /* Slate 800 */
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .agent-card:hover {
+            border-color: rgba(56, 189, 248, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .card-title-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .card-subtitle {
+            font-size: 12px;
+            color: #94a3b8;
+            max-width: 90%;
+            line-height: 1.4;
+        }
+
+        .status-badge {
+            background: rgba(56, 189, 248, 0.1);
+            color: #38bdf8;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-badge.completed {
+            background: rgba(34, 197, 94, 0.1);
+            color: #4ade80;
+        }
+
+        .pulsing-dot {
+            width: 6px;
+            height: 6px;
+            background-color: currentColor;
+            border-radius: 50%;
+        }
+
+        .pulsing-dot.active {
+            animation: pulse 1.5s infinite cubic-bezier(0.4, 0, 0.6, 1);
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: .4;
+                transform: scale(1.2);
+            }
+        }
+
+        .card-body {
+            flex-grow: 1;
+            padding: 15px 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Responsive Flow Area */
+        .card-content-split {
+            display: flex;
+            gap: 10px;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding-bottom: 10px;
+            padding-right: 5px;
+        }
+
+        .steps-column {
+            flex: 6;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .graphic-column {
+            flex: 4;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-left: 1px dashed rgba(255, 255, 255, 0.1);
+            padding: 10px 0;
+            margin-left: 5px;
+        }
+
+        .workflow-visual {
+            position: absolute;
+            top: 10px;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .line-bg {
+            position: absolute;
+            left: calc(50% - 25px);
+            top: 10px;
+            bottom: 10px;
+            width: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 1;
+        }
+
+        .line-progress {
+            position: absolute;
+            left: calc(50% - 25px);
+            top: 10px;
+            width: 2px;
+            height: 0%;
+            background: #38bdf8;
+            z-index: 2;
+            transition: height 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+        }
+
+        .node-wrapper {
+            position: relative;
+            z-index: 3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .node-circle {
+            position: absolute;
+            left: calc(50% - 35px);
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #1e293b;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.4s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .node-circle.active {
+            border-color: #38bdf8;
+            background: rgba(56, 189, 248, 0.2);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+            transform: scale(1.15);
+        }
+
+        .node-circle.done {
+            border-color: #4ade80;
+            background: rgba(34, 197, 94, 0.2);
+        }
+
+        .node-circle svg {
+            width: 10px;
+            height: 10px;
+            stroke: rgba(255, 255, 255, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .node-circle.active svg {
+            stroke: #38bdf8;
+        }
+
+        .node-circle.done svg {
+            stroke: #4ade80;
+        }
+
+        .node-label-small {
+            position: absolute;
+            left: calc(50% - 5px);
+            font-size: 10px;
+            color: #64748b;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+
+        /* Progress Steps */
+        .step-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: auto;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            opacity: 0.4;
+            transition: all 0.4s ease;
+            transform: translateY(5px);
+        }
+
+        .step-item.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .step-item.active .step-icon {
+            background: rgba(56, 189, 248, 0.15);
+            color: #38bdf8;
+            border-color: rgba(56, 189, 248, 0.4);
+        }
+
+        .step-item.done {
+            opacity: 0.7;
+            transform: translateY(0);
+        }
+
+        .step-item.done .step-icon {
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+            border-color: rgba(34, 197, 94, 0.4);
+        }
+
+        .step-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 14px;
+            flex-shrink: 0;
+            transition: all 0.3s ease;
+        }
+
+        .step-content {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding-top: 4px;
+            width: 100%;
+        }
+
+        .step-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .step-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+
+        .step-duration {
+            font-size: 10px;
+            color: #38bdf8;
+            font-family: 'Consolas', monospace;
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: nowrap;
+        }
+
+        .step-item.active .step-duration,
+        .step-item.done .step-duration {
+            opacity: 1;
+        }
+
+        .step-tech {
+            font-family: 'Consolas', monospace;
+            font-size: 10px;
+            color: #64748b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        /* Final Insight Card */
+        .insight-card {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.1) 0%, rgba(14, 165, 233, 0.05) 100%);
+            border: 0px solid rgba(56, 189, 248, 0.2);
+            border-radius: 12px;
+            padding: 0px 16px;
+            margin-top: 10px;
+            opacity: 0;
+            max-height: 0;
+            overflow: auto;
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            flex-shrink: 0;
+        }
+
+        .insight-card.visible {
+            opacity: 1;
+            max-height: 180px;
+            padding: 16px;
+            border-width: 1px;
+        }
+
+        .insight-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            color: #38bdf8;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .insight-body {
+            font-size: 15px;
+            color: #f8fafc;
+            line-height: 1.5;
+            font-weight: 400;
+        }
+
+        /* Cinematic Outro Overlay */
+        #outro-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1.5s ease-in;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .overlay-visible {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        .outro-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 40px;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 1s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        .outro-item.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .outro-title {
+            font-size: 2.5em;
+            font-weight: 300;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            color: #f8fafc;
+        }
+
+        .outro-desc {
+            font-size: 1.2em;
+            color: #94a3b8;
+            max-width: 800px;
+            line-height: 1.6;
+            font-weight: 400;
+        }
+
+        .logo-text {
+            font-size: 5em;
+            font-weight: 700;
+            letter-spacing: -2px;
+            background: linear-gradient(180deg, #f8fafc 0%, #38bdf8 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 50px;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 1.5s ease-out;
+            filter: drop-shadow(0 0 30px rgba(56, 189, 248, 0.3));
+        }
+
+        .logo-text.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .replay-btn-outro {
+            margin-top: 30px;
+            padding: 12px 32px;
+            font-size: 15px;
+            font-weight: 600;
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.5);
+            color: #38bdf8;
+            border-radius: 50px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.8s ease, background 0.3s;
+            cursor: pointer;
+        }
+
+        .replay-btn-outro.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .replay-btn-outro:hover {
+            background: rgba(56, 189, 248, 0.2);
+            color: #fff;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>TiDB Zero × Autonomous Agents Business Value</h1>
+        <div class="controls">
+            <span id="global-timer" class="timer">00:00.00</span>
+            <button id="pause-toggle" onclick="togglePause()">Pause ⏸</button>
+            <button id="speed-toggle" onclick="toggleSpeed()">Speed: 1x (Real-Time)</button>
+            <button onclick="location.reload()">Reset Demo ↺</button>
+        </div>
+    </header>
+
+    <div class="grid-container" id="grid-container">
+        <!-- Agent cards will be injected here -->
+    </div>
+
+    <div id="outro-overlay">
+        <div id="outro-logo" class="logo-text">TiDB Zero - AI Agents Essential</div>
+        <div class="outro-item" id="outro-block-1">
+            <div class="outro-title">Infinite Dynamic Memory</div>
+            <div class="outro-desc">Agents spin up and destroy database environments instantly, giving them unbounded
+                scratchpads without ops overhead.</div>
+        </div>
+        <div class="outro-item" id="outro-block-2">
+            <div class="outro-title">Self-Structuring Knowledge</div>
+            <div class="outro-desc">TiDB Zero empowers AI to automatically detect patterns and design schemas for messy
+                internet data in real-time.</div>
+        </div>
+        <div class="outro-item" id="outro-block-3">
+            <div class="outro-title">Rigorous SQL Reasoning</div>
+            <div class="outro-desc">Moving beyond hallucination-prone text models into precise, deterministically
+                verifiable logic and insights.</div>
+        </div>
+        <button class="replay-btn-outro" id="outro-replay" onclick="location.reload()">Watch Again</button>
+    </div>
+
+    <script>
+        let speedMultiplier = 1;
+        let isPaused = false;
+        const terminalIds = ["techcrunch", "earthquake", "tokyo", "lobsters"];
+        let isComplete = { "techcrunch": false, "earthquake": false, "tokyo": false, "lobsters": false };
+        let earthquakeEarlyExitTriggered = false;
+
+        let globalTimeMs = 0;
+        let lastTickTime = Date.now();
+
+        // Business-friendly metadata
+        const SCENARIO_META = {
+            "techcrunch": {
+                title: "Market Intelligence Agent",
+                desc: "Monitoring TechCrunch to spot emerging AI trends within minutes.",
+                icon: "📈"
+            },
+            "earthquake": {
+                title: "Risk Analysis Agent",
+                desc: "Clustering seismic activity from USGS to identify global risk zones.",
+                icon: "🌍"
+            },
+            "tokyo": {
+                title: "Supply Chain / Weather Agent",
+                desc: "Analyzing Open-Meteo forecasts to predict localized temperature plunges.",
+                icon: "⛅"
+            },
+            "lobsters": {
+                title: "Engineering Sentiment Agent",
+                desc: "Scanning Lobste.rs community discussions for the next big dev-tool trend.",
+                icon: "💬"
+            }
+        };
+
+        // Mapping technical log kinds to Business Steps
+        const STEP_MAP = {
+            "1_env": { icon: "🧠", title: "Provision memory", short: "Provision", seq: 0 },
+            "2_fetch": { icon: "🌐", title: "Gather live data", short: "Source", seq: 1 },
+            "3_schema": { icon: "🧩", title: "Structure schemas", short: "Schema", seq: 2 },
+            "4_ingest": { icon: "💾", title: "Ingest actual records", short: "Store", seq: 3 },
+            "5_analyze": { icon: "💡", title: "Execute logic", short: "Analyze", seq: 4 },
+            "6_insight": { icon: "🎯", title: "Deliver insight", short: "Insight", seq: 5 }
+        };
+        const STEP_KEYS = ['1_env', '2_fetch', '3_schema', '4_ingest', '5_analyze', '6_insight'];
+
+        function getStepData(log) {
+            if (log.kind === "TIDB_ZERO") return { step: "1_env", tech: log.message.substring(0, 40) + "..." };
+            if (log.message.includes("http_fetch")) return { step: "2_fetch", tech: "GET request executing..." };
+            if (log.message.includes("[DDL]")) return { step: "3_schema", tech: "CREATE TABLE schema inferred" };
+            if (log.message.includes("[DML]")) return { step: "4_ingest", tech: "Batch INSERT INTO TiDB Zero" };
+            if (log.message.includes("[QUERY]") || log.kind === "SQL") return { step: "5_analyze", tech: "SELECT complex query running" };
+            if (log.kind === "FINAL") return { step: "6_insight", tech: "" };
+            return null; // Ignore THINK logs for the business view to keep it clean, or could map to an intermediate step.
+        }
+
+        function getFinalInsightMessage(id) {
+            if (id === "techcrunch") return "'AI Data Center Infrastructure' is rapidly rising. Recommend adjusting Q3 investment thesis.";
+            if (id === "earthquake") return "Identified major clustering in Alaska/Oklahoma. Logistics routing should factor in potential delays.";
+            if (id === "tokyo") return "Confirmed significant 7.2°C cooling cycle in 48h. Warn Tokyo hub to prepare temperature-sensitive cargo.";
+            if (id === "lobsters") return "'Vibecoding' is dominating dev mindshare. Consider marketing campaigns around developer experience.";
+        }
+
+        function initGrid() {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = '';
+            terminalIds.forEach(id => {
+                const meta = SCENARIO_META[id];
+                const card = document.createElement('div');
+                card.className = 'agent-card';
+                card.id = `card-${id}`;
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="card-title-group">
+                            <div class="card-title">${meta.icon} ${meta.title}</div>
+                            <div class="card-subtitle">${meta.desc}</div>
+                        </div>
+                        <div class="status-badge" id="badge-${id}">
+                            <div class="pulsing-dot active"></div>
+                            <span id="status-text-${id}">Initializing</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="card-content-split">
+                            <div class="steps-column">
+                                <ul class="step-list" id="steps-${id}">
+                                    ${['1_env', '2_fetch', '3_schema', '4_ingest', '5_analyze'].map(stepKey => `
+                                        <li class="step-item" id="step-${id}-${stepKey}">
+                                            <div class="step-icon">${STEP_MAP[stepKey].icon}</div>
+                                            <div class="step-content">
+                                                <div class="step-header-row">
+                                                    <div class="step-title">${STEP_MAP[stepKey].title}</div>
+                                                    <div class="step-duration" id="duration-${id}-${stepKey}">loading...</div>
+                                                </div>
+                                                <div class="step-tech" id="tech-${id}-${stepKey}">Pending...</div>
+                                            </div>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                            <div class="graphic-column">
+                                <div class="workflow-visual">
+                                    <div class="line-bg"></div>
+                                    <div class="line-progress" id="progress-line-${id}"></div>
+                                    ${STEP_KEYS.map((stepKey, idx) => `
+                                        <div class="node-wrapper">
+                                            <div class="node-circle" id="node-${id}-${stepKey}">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                            </div>
+                                            <div class="node-label-small">${STEP_MAP[stepKey].short}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="insight-card" id="insight-${id}">
+                            <div class="insight-header">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                Actionable Insight
+                            </div>
+                            <div class="insight-body">${getFinalInsightMessage(id)}</div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function customDelay(baseMs) {
+            let remainingMs = baseMs;
+            while (remainingMs > 0) {
+                if (!isPaused) {
+                    const decrement = 20 * speedMultiplier;
+                    remainingMs -= decrement;
+                }
+                await new Promise(r => setTimeout(r, 20));
+            }
+        }
+
+        async function runScenario(id) {
+            const logs = SCENARIO_DATA[id].logs;
+            let currentActiveStepKey = null;
+
+            await customDelay(500);
+            updateStatusBadge(id, "Agent Running", false);
+
+            let previousLogTime = new Date(logs[0].ts).getTime();
+            let stepStartTime = null;
+
+            for (let i = 0; i < logs.length; i++) {
+                if (id === 'earthquake' && earthquakeEarlyExitTriggered) break;
+
+                const log = logs[i];
+                const currentLogTime = new Date(log.ts).getTime();
+                let delay = currentLogTime - previousLogTime;
+                if (delay < 20) delay = 20;
+
+                await customDelay(delay);
+
+                const stepInfo = getStepData(log);
+
+                if (stepInfo) {
+                    // Moving to a new step
+                    if (currentActiveStepKey !== stepInfo.step) {
+                        // Mark old as done and record duration
+                        if (currentActiveStepKey) {
+                            const elapsed = currentLogTime - stepStartTime;
+
+                            // Visual updates for list
+                            if (currentActiveStepKey !== '6_insight') {
+                                const oldStep = document.getElementById(`step-${id}-${currentActiveStepKey}`);
+                                oldStep.classList.remove('active');
+                                oldStep.classList.add('done');
+
+                                const durEl = document.getElementById(`duration-${id}-${currentActiveStepKey}`);
+                                durEl.textContent = (elapsed / 1000).toFixed(1) + 's';
+                            }
+
+                            // Visual updates for Graphic Workflow Node
+                            const oldNode = document.getElementById(`node-${id}-${currentActiveStepKey}`);
+                            if (oldNode) {
+                                oldNode.classList.remove('active');
+                                oldNode.classList.add('done');
+                            }
+                        }
+
+                        // Setup new step
+                        currentActiveStepKey = stepInfo.step;
+                        stepStartTime = currentLogTime;
+
+                        // Activate new graphic node
+                        const newNode = document.getElementById(`node-${id}-${currentActiveStepKey}`);
+                        if (newNode) newNode.classList.add('active');
+
+                        // Update progress line height (seq: 0 to 5 -> 0% to 100%)
+                        const progressEl = document.getElementById(`progress-line-${id}`);
+                        const seq = STEP_MAP[currentActiveStepKey].seq;
+                        progressEl.style.height = (seq / 5 * 100) + '%';
+
+                        // Mark new step as active in the list
+                        if (currentActiveStepKey !== '6_insight') {
+                            const newStep = document.getElementById(`step-${id}-${currentActiveStepKey}`);
+                            newStep.classList.add('active');
+                            document.getElementById(`duration-${id}-${currentActiveStepKey}`).textContent = '...';
+                        }
+                    }
+
+                    // Update tech text subtly
+                    if (currentActiveStepKey !== '6_insight' && stepInfo.tech) {
+                        const techEl = document.getElementById(`tech-${id}-${stepInfo.step}`);
+                        techEl.textContent = stepInfo.tech;
+                    }
+
+                    // Final Insight Reached
+                    if (stepInfo.step === "6_insight") {
+                        break; // Exit loop, show insight
+                    }
+                }
+
+                previousLogTime = currentLogTime;
+            }
+
+            // Finish Scenario
+            updateStatusBadge(id, "Mission Accomplished", true);
+            const insightCard = document.getElementById(`insight-${id}`);
+            insightCard.classList.add('visible');
+
+            isComplete[id] = true;
+            checkAllComplete();
+        }
+
+        function updateStatusBadge(id, text, isDone) {
+            const badge = document.getElementById(`badge-${id}`);
+            const textEl = document.getElementById(`status-text-${id}`);
+            const dot = badge.querySelector('.pulsing-dot');
+
+            textEl.textContent = text;
+            if (isDone) {
+                badge.classList.add('completed');
+                if (dot) dot.classList.remove('active');
+                if (dot) dot.style.display = 'none';
+            }
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('pause-toggle');
+            if (isPaused) {
+                btn.textContent = "Play ▶️";
+                btn.classList.add('paused');
+            } else {
+                btn.textContent = "Pause ⏸";
+                btn.classList.remove('paused');
+            }
+        }
+
+        function toggleSpeed() {
+            speedMultiplier = speedMultiplier === 1 ? 10 : 1;
+            document.getElementById('speed-toggle').textContent = `Speed: ${speedMultiplier}x (${speedMultiplier === 1 ? 'Real-Time' : 'Fast'})`;
+        }
+
+        function startGlobalTimer() {
+            lastTickTime = Date.now();
+            const timerEl = document.getElementById('global-timer');
+
+            setInterval(() => {
+                const now = Date.now();
+                const deltaRealMs = now - lastTickTime;
+                lastTickTime = now;
+
+                if (!isPaused) {
+                    globalTimeMs += (deltaRealMs * speedMultiplier);
+                }
+
+                const totalMs = globalTimeMs;
+                const m = Math.floor(totalMs / 60000).toString().padStart(2, '0');
+                const s = Math.floor((totalMs % 60000) / 1000).toString().padStart(2, '0');
+                const ms = Math.floor((totalMs % 1000) / 10).toString().padStart(2, '0');
+
+                timerEl.textContent = `${m}:${s}.${ms}`;
+            }, 40);
+        }
+
+        function checkAllComplete() {
+            const coreTasks = ["techcrunch", "tokyo", "lobsters"];
+            const coreFinished = coreTasks.every(id => isComplete[id]);
+
+            if (coreFinished && !isComplete["earthquake"] && !earthquakeEarlyExitTriggered) {
+                earthquakeEarlyExitTriggered = true;
+                // Force earthquake to finish early
+                updateStatusBadge("earthquake", "Priority Overwrite", false);
+                customDelay(3000).then(() => {
+                    const insightCard = document.getElementById(`insight-earthquake`);
+                    insightCard.classList.add('visible');
+                    updateStatusBadge("earthquake", "Mission Accomplished", true);
+                    isComplete["earthquake"] = true;
+                    playOutro();
+                });
+            } else if (Object.values(isComplete).every(v => v === true)) {
+                playOutro();
+            }
+        }
+
+        function playOutro() {
+            if (document.getElementById('outro-overlay').classList.contains('overlay-visible')) return;
+
+            document.getElementById('outro-overlay').classList.add('overlay-visible');
+            const seq = [
+                { id: 'outro-logo', delay: 800 },
+                { id: 'outro-block-1', delay: 2000 },
+                { id: 'outro-block-2', delay: 3500 },
+                { id: 'outro-block-3', delay: 5000 },
+                { id: 'outro-replay', delay: 6500 }
+            ];
+            seq.forEach(item => {
+                setTimeout(() => {
+                    const el = document.getElementById(item.id);
+                    if (el) el.classList.add('visible');
+                }, item.delay);
+            });
+        }
+
+        window.onload = () => {
+            initGrid();
+            startGlobalTimer();
+            terminalIds.forEach(id => runScenario(id));
+        };
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TiDB Zero Agent - Ultimate Showcase</title>
+    <script src="unified_scenarios_data.js"></script>
+    <style>
+        /* Base Reset */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0d0d0d;
+            color: #d4d4d4;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        header {
+            background-color: #1a1a1a;
+            padding: 10px 25px;
+            height: 65px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #333;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 300;
+            color: #fff;
+            letter-spacing: 1px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .timer {
+            font-family: 'Courier New', Courier, monospace;
+            color: #4ec9b0;
+            font-size: 1.4em;
+            font-weight: bold;
+            min-width: 140px;
+            text-align: right;
+            text-shadow: 0 0 10px rgba(78, 201, 176, 0.4);
+        }
+
+        button {
+            background: linear-gradient(135deg, #0e639c, #1177bb);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            filter: brightness(1.2);
+            transform: translateY(-1px);
+        }
+
+        /* Grid Layout */
+        .grid-container {
+            flex-grow: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 6px;
+            background-color: #000;
+            padding: 6px;
+            height: calc(100vh - 65px);
+            overflow: hidden;
+        }
+
+        .terminal-wrapper {
+            background-color: #111;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+            border-radius: 6px;
+            border: 1px solid #2a2a2a;
+        }
+
+        .terminal-header {
+            background-color: #1e1e1e;
+            padding: 8px 15px;
+            font-size: 12px;
+            color: #fff;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .desc-label {
+            color: #888;
+            font-weight: normal;
+            font-size: 11px;
+            margin-left: 10px;
+        }
+
+        .terminal-content {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            background-color: #0a0a0a;
+        }
+
+        /* Explanation Bar */
+        .explanation-bar {
+            background-color: #000;
+            color: #4ec9b0;
+            padding: 10px 15px;
+            font-size: 13px;
+            border-top: 1px solid #222;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .explanation-icon {
+            margin-right: 10px;
+            font-size: 1.3em;
+        }
+
+        /* Terminal Colors */
+        .prompt {
+            color: #569cd6;
+            font-weight: bold;
+        }
+
+        .command {
+            color: #ce9178;
+        }
+
+        .info {
+            color: #9cdcfe;
+        }
+
+        .success {
+            color: #6a9955;
+        }
+
+        .warning {
+            color: #dcdcaa;
+        }
+
+        .sql {
+            color: #c586c0;
+        }
+
+        .timestamp {
+            color: #666;
+            margin-right: 10px;
+            font-size: 0.9em;
+        }
+
+        /* Cursor */
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 15px;
+            background-color: #d4d4d4;
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* Cinematic Outro Overlay */
+        #outro-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 2.5s ease-in;
+            color: white;
+            text-align: center;
+            padding: 40px;
+        }
+
+        /* Unified Visibility class for all outro elements */
+        .visible {
+            opacity: 1 !important;
+            transform: translateY(0) scale(1) !important;
+        }
+
+        .outro-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 50px;
+            opacity: 0;
+            transform: translateY(40px);
+            transition: all 1.5s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        .outro-title {
+            font-size: 3em;
+            font-weight: 200;
+            letter-spacing: 4px;
+            margin-bottom: 12px;
+        }
+
+        .outro-desc {
+            font-size: 1.6em;
+            color: #888;
+            max-width: 1000px;
+            line-height: 1.6;
+            font-weight: 300;
+        }
+
+        .logo-text {
+            font-size: 8em;
+            font-weight: 800;
+            letter-spacing: -3px;
+            background: linear-gradient(180deg, #fff 0%, #4ec9b0 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 60px;
+            opacity: 0;
+            transform: scale(0.85);
+            transition: all 2.5s ease-out;
+            filter: drop-shadow(0 0 40px rgba(78, 201, 176, 0.4));
+        }
+
+        .overlay-visible {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        .replay-btn-outro {
+            margin-top: 40px;
+            padding: 12px 30px;
+            font-size: 16px;
+            background: transparent;
+            border: 2px solid #4ec9b0;
+            color: #4ec9b0;
+            border-radius: 50px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 1s ease;
+        }
+
+        .replay-btn-outro:hover {
+            background: rgba(78, 201, 176, 0.2);
+            color: #fff;
+            transform: translateY(18px);
+            box-shadow: 0 0 15px rgba(78, 201, 176, 0.4);
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>🤖 TiDB Zero: Autonomous Agent Infrastructure Showcase</h1>
+        <div class="controls">
+            <span id="global-timer" class="timer">00:00.00</span>
+            <button id="pause-toggle" onclick="togglePause()">Pause ⏸</button>
+            <button id="speed-toggle" onclick="toggleSpeed()">Speed: 1x (Real-Time)</button>
+            <button onclick="location.reload()">Replay ↺</button>
+        </div>
+    </header>
+
+    <div class="grid-container"></div>
+
+    <div id="outro-overlay">
+        <div id="outro-logo" class="logo-text">TiDB Zero</div>
+        <div class="outro-item" id="outro-block-1">
+            <div class="outro-title">Instant Provisioning</div>
+            <div class="outro-desc">Ready in seconds. The dedicated "Instant Memory" for every Agent session.</div>
+        </div>
+        <div class="outro-item" id="outro-block-2">
+            <div class="outro-title">Schema-on-Demand</div>
+            <div class="outro-desc">Structure unstructured data on the fly, enabling complex reasoning.</div>
+        </div>
+        <div class="outro-item" id="outro-block-3">
+            <div class="outro-title">SQL Reasoning</div>
+            <div class="outro-desc">Empowering Agents with a precise, logical "Left Brain".</div>
+        </div>
+        <button class="replay-btn-outro" id="outro-replay" onclick="location.reload()">Watch Again</button>
+    </div>
+
+    <script>
+        let speedMultiplier = 1;
+        let isPaused = false;
+        const terminalIds = ["techcrunch", "earthquake", "tokyo", "lobsters"];
+        let isComplete = { "techcrunch": false, "earthquake": false, "tokyo": false, "lobsters": false };
+        let earthquakeEarlyExitTriggered = false;
+
+        // Timer tracking variables
+        let globalTimeMs = 0;
+        let lastTickTime = Date.now();
+
+        const SCENARIO_LABELS = {
+            "techcrunch": "Detecting AI & Startups Trends via live TechCrunch RSS feed analysis",
+            "earthquake": "Automated Clustering of global seismic events using USGS GeoJSON API",
+            "tokyo": "48-Hour Temperature Outlook for Tokyo leveraging Open-Meteo high-res data",
+            "lobsters": "Mining Top Engineering Topics and discussions from Lobste.rs community"
+        };
+
+        const TASK_META = {
+            "techcrunch": { topic: "Tech Trends", target: "Startups & AI" },
+            "earthquake": { topic: "Seismic Data", target: "clusters" },
+            "tokyo": { topic: "Weather", target: "temperature trends" },
+            "lobsters": { topic: "Engineering", target: "hot topics" }
+        };
+
+        function getExplanation(id, log) {
+            const meta = TASK_META[id];
+            if (log.kind === "TIDB_ZERO") return `🚀 Instant DB: Allocating a private ${meta.topic} sandbox for the Agent session.`;
+            if (log.message.includes("http_fetch")) return `🌐 Live Web: Agent is fetching fresh ${meta.topic} data for real-time context.`;
+            if (log.message.includes("[DDL]")) return `🧠 Organizing: Automatically structuring raw data into SQL tables.`;
+            if (log.message.includes("[DML]")) return `💾 Memorizing: Ingesting ${meta.topic} facts into TiDB's serverless environment.`;
+            if (log.message.includes("[QUERY]")) return `💡 Analyzing: Executing SQL reasoning to identify key signals in ${meta.target}.`;
+
+            if (log.kind === "FINAL") {
+                if (id === "techcrunch") return "✅ Discovery: Top trend identified as 'AI Data Center Infrastructure'.";
+                if (id === "earthquake") return "✅ Discovery: Mapped active clusters in Alaska and Oklahoma with SQL evidence.";
+                if (id === "tokyo") return "✅ Discovery: Confirmed 48h cooling cycle (-7.2°C) via trend analysis.";
+                if (id === "lobsters") return "✅ Discovery: 'Vibecoding' detected as the overwhelming dominant topic.";
+            }
+
+            if (log.kind === "THINK") return "🤔 Agent is evaluating facts and weighting analytic evidence...";
+            return "";
+        }
+
+        function initGrid() {
+            const container = document.querySelector('.grid-container');
+            container.innerHTML = '';
+            terminalIds.forEach(id => {
+                const data = SCENARIO_DATA[id];
+                const wrapper = document.createElement('div');
+                wrapper.className = 'terminal-wrapper';
+                wrapper.innerHTML = `
+                    <div class="terminal-header">
+                        <span>${data.title}</span>
+                        <span class="desc-label">${SCENARIO_LABELS[id]}</span>
+                    </div>
+                    <div class="terminal-content" id="term-${id}"></div>
+                    <div class="explanation-bar">
+                        <span class="explanation-icon">ℹ️</span>
+                        <span class="explanation-text" id="exp-${id}">Starting Agent cycle...</span>
+                    </div>
+                `;
+                container.appendChild(wrapper);
+                const term = wrapper.querySelector(`#term-${id}`);
+                const cursor = document.createElement('span');
+                cursor.className = 'cursor';
+                term.appendChild(cursor);
+            });
+        }
+
+        async function runScenario(id) {
+            const data = SCENARIO_DATA[id];
+            const logs = data.logs;
+            const term = document.getElementById(`term-${id}`);
+            const expText = document.getElementById(`exp-${id}`);
+            const cursor = term.querySelector('.cursor');
+
+            const promptLine = document.createElement('div');
+            promptLine.innerHTML = `<span class="prompt">user@agent:~$</span> <span class="command">${data.command}</span>`;
+            term.insertBefore(promptLine, cursor);
+
+            await customDelay(800);
+
+            let previousLogTime = new Date(logs[0].ts).getTime();
+
+            for (let i = 0; i < logs.length; i++) {
+                if (id === 'earthquake' && earthquakeEarlyExitTriggered) {
+                    const stopMsg = document.createElement('div');
+                    stopMsg.innerHTML = `<br><span class="warning">⚠️ Mission Accelerated: Concluding early based on global session sync.</span>`;
+                    term.insertBefore(stopMsg, cursor);
+                    break;
+                }
+
+                const log = logs[i];
+                const currentLogTime = new Date(log.ts).getTime();
+                let delay = currentLogTime - previousLogTime;
+                if (delay < 20) delay = 20;
+
+                await customDelay(delay);
+
+                const explanation = getExplanation(id, log);
+                if (explanation) textUpdate(expText, explanation);
+
+                const line = document.createElement('div');
+                let className = 'info';
+                if (log.kind === 'TIDB_ZERO') className = 'success';
+                else if (log.kind === 'THINK') className = 'warning';
+                else if (log.kind === 'SQL') className = 'sql';
+                else if (log.kind === 'FINAL') className = 'success';
+
+                line.className = className;
+                const timeStr = new Date(log.ts).toLocaleTimeString('en-GB', { hour12: false });
+                line.innerHTML = `<span class="timestamp">[${timeStr}] [${log.kind}]</span><span></span>`;
+                term.insertBefore(line, cursor);
+                const contentSpan = line.querySelector('span:last-child');
+
+                await typeWriter(log.message, contentSpan, term);
+                previousLogTime = currentLogTime;
+                term.scrollTop = term.scrollHeight;
+            }
+
+            const completeLine = document.createElement('div');
+            completeLine.innerHTML = `<br><span class="success">✨ Demo Complete. [Scenario: ${id.toUpperCase()}]</span>`;
+            term.insertBefore(completeLine, cursor);
+            term.scrollTop = term.scrollHeight;
+
+            isComplete[id] = true;
+            checkAllComplete();
+        }
+
+        async function typeWriter(text, element, container) {
+            const step = speedMultiplier > 1 ? 15 : 3;
+            for (let i = 0; i < text.length; i += step) {
+                element.textContent += text.substring(i, i + step);
+                if (i % 20 === 0) container.scrollTop = container.scrollHeight;
+                await customDelay(speedMultiplier > 1 ? 1 : 5);
+            }
+        }
+
+        // A delay function that correctly respects Pause and Speed multiplier dynamically
+        async function customDelay(baseMs) {
+            let remainingMs = baseMs;
+            while (remainingMs > 0) {
+                if (!isPaused) {
+                    const decrement = 20 * speedMultiplier;
+                    remainingMs -= decrement;
+                }
+                await new Promise(r => setTimeout(r, 20)); // check every 20ms of real clock time
+            }
+        }
+
+        function textUpdate(element, text) {
+            element.style.opacity = 0.4;
+            setTimeout(() => {
+                element.textContent = text;
+                element.style.opacity = 1;
+            }, 100);
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('pause-toggle');
+            btn.textContent = isPaused ? "Play ▶️" : "Pause ⏸";
+            if (isPaused) {
+                btn.style.background = "linear-gradient(135deg, #cc6600, #ff9933)";
+            } else {
+                btn.style.background = "linear-gradient(135deg, #0e639c, #1177bb)";
+            }
+        }
+
+        function toggleSpeed() {
+            speedMultiplier = speedMultiplier === 1 ? 10 : 1;
+            document.getElementById('speed-toggle').textContent = `Speed: ${speedMultiplier}x (${speedMultiplier === 1 ? 'Real-Time' : 'Fast'})`;
+        }
+
+        function startGlobalTimer() {
+            lastTickTime = Date.now();
+            const timerEl = document.getElementById('global-timer');
+
+            setInterval(() => {
+                const now = Date.now();
+                const deltaRealMs = now - lastTickTime;
+                lastTickTime = now;
+
+                if (!isPaused) {
+                    globalTimeMs += (deltaRealMs * speedMultiplier);
+                }
+
+                const totalMs = globalTimeMs;
+                const m = Math.floor(totalMs / 60000).toString().padStart(2, '0');
+                const s = Math.floor((totalMs % 60000) / 1000).toString().padStart(2, '0');
+                const ms = Math.floor((totalMs % 1000) / 10).toString().padStart(2, '0');
+
+                timerEl.textContent = `${m}:${s}.${ms}`;
+            }, 40);
+        }
+
+        function checkAllComplete() {
+            const coreTasks = ["techcrunch", "tokyo", "lobsters"];
+            const coreFinished = coreTasks.every(id => isComplete[id]);
+
+            if (coreFinished && !isComplete["earthquake"] && !earthquakeEarlyExitTriggered) {
+                earthquakeEarlyExitTriggered = true;
+                // Use customDelay so we don't trigger while paused
+                customDelay(5000).then(() => {
+                    isComplete["earthquake"] = true;
+                    playOutro();
+                });
+            } else if (Object.values(isComplete).every(v => v === true)) {
+                playOutro();
+            }
+        }
+
+        function playOutro() {
+            if (document.getElementById('outro-overlay').classList.contains('overlay-visible')) return;
+
+            setTimeout(() => {
+                document.getElementById('outro-overlay').classList.add('overlay-visible');
+                // Logo comes first and is big
+                const seq = [
+                    { id: 'outro-logo', delay: 800 },
+                    { id: 'outro-block-1', delay: 2800 },
+                    { id: 'outro-block-2', delay: 4800 },
+                    { id: 'outro-block-3', delay: 6800 },
+                    { id: 'outro-replay', delay: 8500 }
+                ];
+                seq.forEach(item => {
+                    setTimeout(() => {
+                        const el = document.getElementById(item.id);
+                        if (el) el.classList.add('visible');
+                    }, item.delay);
+                });
+            }, 1000);
+        }
+
+        window.onload = () => {
+            initGrid();
+            startGlobalTimer();
+            terminalIds.forEach(id => runScenario(id));
+        };
+    </script>
+</body>
+
+</html>
