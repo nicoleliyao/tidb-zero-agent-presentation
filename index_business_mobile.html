@@ -779,11 +779,11 @@
         function getStepData(log) {
             if (log.kind === "TIDB_ZERO") return { step: "1_env", tech: log.message.substring(0, 40) + "..." };
             if (log.message.includes("http_fetch")) return { step: "2_fetch", tech: "GET request executing..." };
-            if (log.message.includes("[DDL]")) return { step: "3_schema", tech: "CREATE TABLE schema inferred" };
-            if (log.message.includes("[DML]")) return { step: "4_ingest", tech: "Batch INSERT INTO TiDB Zero" };
-            if (log.message.includes("[QUERY]") || log.kind === "SQL") return { step: "5_analyze", tech: "SELECT complex query running" };
+            if (log.message.includes("CREATE TABLE") || log.message.includes("CREATE DATABASE") || log.message.includes("[DDL]")) return { step: "3_schema", tech: "Structuring Schema" };
+            if (log.message.includes("INSERT INTO") || log.message.includes("[DML]")) return { step: "4_ingest", tech: "Batch INSERT Executing" };
+            if (log.message.includes("SELECT") || log.message.includes("[QUERY]") || log.kind === "SQL") return { step: "5_analyze", tech: "Executing SQL Logic" };
             if (log.kind === "FINAL") return { step: "6_insight", tech: "" };
-            return null; // Ignore THINK logs for the business view to keep it clean, or could map to an intermediate step.
+            return null;
         }
 
         function getFinalInsightMessage(id) {
@@ -874,6 +874,7 @@
         async function runScenario(id) {
             const logs = SCENARIO_DATA[id].logs;
             let currentActiveStepKey = null;
+            let lastActiveStepKey = null;
 
             await customDelay(500);
             updateStatusBadge(id, "Agent Running", false);
@@ -891,26 +892,27 @@
 
                 await customDelay(delay);
 
+                // Match the tech demo's typewriter visual delay so total simulated time matches exactly.
+                const typingStep = speedMultiplier > 1 ? 15 : 3;
+                for (let j = 0; j < log.message.length; j += typingStep) {
+                    await customDelay(speedMultiplier > 1 ? 1 : 5);
+                }
+
                 const stepInfo = getStepData(log);
 
                 if (stepInfo) {
-                    // Moving to a new step
                     if (currentActiveStepKey !== stepInfo.step) {
-                        // Mark old as done and record duration
+                        // If there was an active step, mark it done
                         if (currentActiveStepKey) {
                             const elapsed = currentLogTime - stepStartTime;
-
-                            // Visual updates for list
-                            if (currentActiveStepKey !== '6_insight') {
-                                const oldStep = document.getElementById(`step-${id}-${currentActiveStepKey}`);
+                            const oldStep = document.getElementById(`step-${id}-${currentActiveStepKey}`);
+                            if (oldStep) {
                                 oldStep.classList.remove('active');
                                 oldStep.classList.add('done');
-
-                                const durEl = document.getElementById(`duration-${id}-${currentActiveStepKey}`);
-                                durEl.textContent = (elapsed / 1000).toFixed(1) + 's';
                             }
+                            const durEl = document.getElementById(`duration-${id}-${currentActiveStepKey}`);
+                            if (durEl) durEl.textContent = (Math.max(elapsed, 200) / 1000).toFixed(1) + 's';
 
-                            // Visual updates for Graphic Workflow Node
                             const oldNode = document.getElementById(`node-${id}-${currentActiveStepKey}`);
                             if (oldNode) {
                                 oldNode.classList.remove('active');
@@ -920,34 +922,67 @@
 
                         // Setup new step
                         currentActiveStepKey = stepInfo.step;
+                        lastActiveStepKey = currentActiveStepKey;
                         stepStartTime = currentLogTime;
 
                         // Activate new graphic node
                         const newNode = document.getElementById(`node-${id}-${currentActiveStepKey}`);
                         if (newNode) newNode.classList.add('active');
 
-                        // Update progress line height (seq: 0 to 5 -> 0% to 100%)
+                        // Update progress line height
                         const progressEl = document.getElementById(`progress-line-${id}`);
-                        const seq = STEP_MAP[currentActiveStepKey].seq;
-                        progressEl.style.height = (seq / 5 * 100) + '%';
+                        if (progressEl) {
+                            const seq = STEP_MAP[currentActiveStepKey].seq;
+                            progressEl.style.height = (seq / 5 * 100) + '%';
+                        }
 
                         // Mark new step as active in the list
                         if (currentActiveStepKey !== '6_insight') {
                             const newStep = document.getElementById(`step-${id}-${currentActiveStepKey}`);
-                            newStep.classList.add('active');
-                            document.getElementById(`duration-${id}-${currentActiveStepKey}`).textContent = '...';
+                            if (newStep) newStep.classList.add('active');
+                            const durEl = document.getElementById(`duration-${id}-${currentActiveStepKey}`);
+                            if (durEl) durEl.textContent = '...';
                         }
                     }
 
-                    // Update tech text subtly
                     if (currentActiveStepKey !== '6_insight' && stepInfo.tech) {
                         const techEl = document.getElementById(`tech-${id}-${stepInfo.step}`);
-                        techEl.textContent = stepInfo.tech;
+                        if (techEl) techEl.textContent = stepInfo.tech;
                     }
 
-                    // Final Insight Reached
                     if (stepInfo.step === "6_insight") {
-                        break; // Exit loop, show insight
+                        if (currentActiveStepKey) {
+                            const oldStep = document.getElementById(`step-${id}-${currentActiveStepKey}`);
+                            if (oldStep) oldStep.classList.remove('active');
+                        }
+                        break;
+                    }
+                } else {
+                    // It's a null log (e.g. THINK)
+                    // We immediately end the current active step's timer so it doesn't inflate.
+                    if (currentActiveStepKey) {
+                        const elapsed = currentLogTime - stepStartTime;
+
+                        const oldStep = document.getElementById(`step-${id}-${currentActiveStepKey}`);
+                        if (oldStep) {
+                            oldStep.classList.remove('active');
+                            oldStep.classList.add('done');
+                        }
+                        const durEl = document.getElementById(`duration-${id}-${currentActiveStepKey}`);
+                        if (durEl) durEl.textContent = (Math.max(elapsed, 200) / 1000).toFixed(1) + 's';
+
+                        const oldNode = document.getElementById(`node-${id}-${currentActiveStepKey}`);
+                        if (oldNode) {
+                            oldNode.classList.remove('active');
+                            oldNode.classList.add('done');
+                        }
+
+                        currentActiveStepKey = null;
+                    }
+
+                    if (lastActiveStepKey && lastActiveStepKey !== '6_insight') {
+                        const techEl = document.getElementById(`tech-${id}-${lastActiveStepKey}`);
+                        if (techEl) techEl.textContent = `${log.kind.toLowerCase()}: analyzing memory context...`;
                     }
                 }
 
